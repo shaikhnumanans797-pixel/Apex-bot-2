@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX BOT — Crypto Spot Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #040a0f;
+    --panel: #070e16;
+    --panel2: #0a1520;
+    --border: #0f2535;
+    --accent: #00d4ff;
+    --accent2: #00ff88;
+    --accent3: #ff6b35;
+    --warn: #ffcc00;
+    --danger: #ff3355;
+    --text: #c8dde8;
+    --text2: #5a8a9f;
+    --bull: #00ff88;
+    --bear: #ff3355;
+    --neutral: #ffcc00;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 50% -10%, #00d4ff0d, transparent),
+                radial-gradient(ellipse 60% 40% at 80% 80%, #00ff880a, transparent);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(4,10,15,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap;
+  }
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+  }
+  .logo span { font-size: 11px; font-family: 'JetBrains Mono', monospace; display: block; color: var(--text2); letter-spacing: 2px; -webkit-text-fill-color: var(--text2); }
+  .header-status { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 #00ff8855} 50%{opacity:.7;box-shadow:0 0 0 6px transparent} }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .utc-clock { font-size: 13px; color: var(--accent); font-weight: 600; letter-spacing: 1px; }
+  .safe-badge { font-size: 10px; background: #00ff8815; border: 1px solid #00ff8840; color: var(--accent2); padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; }
+
+  /* NOTIFICATION BAR */
+  #notif-bar {
+    background: linear-gradient(90deg, #00d4ff18, #00ff8810);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 20px;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #notif-bar .notif-icon { font-size: 14px; }
+
+  /* MAIN LAYOUT */
+  .container { position: relative; z-index: 1; padding: 16px; display: grid; grid-template-columns: 260px 1fr 280px; gap: 14px; max-width: 1600px; margin: 0 auto; }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-header {
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-body { padding: 14px; }
+
+  /* LEFT PANEL */
+  .left-panel { display: flex; flex-direction: column; gap: 14px; }
+
+  /* PAIR SELECTOR */
+  .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pair-btn {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 8px 6px;
+    cursor: pointer;
+    text-align: center;
+    transition: all .2s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pair-btn:hover { border-color: var(--accent); background: #00d4ff10; }
+  .pair-btn.active { border-color: var(--accent); background: #00d4ff18; box-shadow: 0 0 10px #00d4ff22; }
+  .pair-btn .pair-name { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .pair-btn .pair-price { font-size: 10px; color: var(--text2); margin-top: 2px; }
+  .pair-btn .pair-chg { font-size: 10px; margin-top: 1px; }
+  .up { color: var(--bull); } .dn { color: var(--bear); }
+
+  /* AMOUNT CONTROL */
+  .amount-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .amount-input {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 12px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 600;
+    outline: none; transition: border-color .2s;
+  }
+  .amount-input:focus { border-color: var(--accent); }
+  .amount-input:disabled { opacity: 0.7; cursor: not-allowed; }
+  .lock-btn {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 12px; cursor: pointer; font-size: 16px;
+    transition: all .2s; color: var(--text2);
+  }
+  .lock-btn.locked { border-color: var(--warn); color: var(--warn); background: #ffcc0012; }
+  .lock-info { font-size: 10px; color: var(--text2); text-align: center; }
+  .lock-info.locked { color: var(--warn); }
+
+  /* WITHDRAWAL */
+  .withdrawal-row {
+    background: #ff335518;
+    border: 1px solid #ff335540;
+    border-radius: 7px;
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .withdrawal-row .wd-icon { font-size: 18px; }
+  .withdrawal-row .wd-text { font-size: 10px; }
+  .withdrawal-row .wd-title { color: var(--danger); font-weight: 600; letter-spacing: 1px; }
+  .withdrawal-row .wd-sub { color: var(--text2); margin-top: 2px; }
+
+  /* STRATEGIES */
+  .strategy-list { display: flex; flex-direction: column; gap: 6px; }
+  .strategy-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 7px; padding: 8px 12px; cursor: pointer; transition: all .2s;
+  }
+  .strategy-item.on { border-color: #00ff8840; background: #00ff8810; }
+  .strategy-name { font-size: 11px; font-weight: 600; }
+  .toggle { width: 32px; height: 18px; border-radius: 9px; background: var(--border); position: relative; transition: background .2s; }
+  .toggle::after { content:''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left .2s; }
+  .strategy-item.on .toggle { background: var(--accent2); }
+  .strategy-item.on .toggle::after { left: 17px; }
+
+  /* CENTER PANEL */
+  .center-panel { display: flex; flex-direction: column; gap: 14px; }
+
+  /* CHART */
+  .chart-wrap { height: 280px; position: relative; }
+  canvas#priceChart { width: 100% !important; height: 100% !important; }
+
+  /* INDICATORS */
+  .indicator-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .ind-card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; text-align: center;
+  }
+  .ind-name { font-size: 9px; color: var(--text2); letter-spacing: 1px; margin-bottom: 4px; }
+  .ind-value { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .ind-signal { font-size: 9px; padding: 2px 8px; border-radius: 10px; display: inline-block; }
+  .sig-buy { background: #00ff8820; color: var(--bull); border: 1px solid #00ff8840; }
+  .sig-sell { background: #ff335520; color: var(--bear); border: 1px solid #ff335540; }
+  .sig-neutral { background: #ffcc0015; color: var(--warn); border: 1px solid #ffcc0040; }
+
+  /* AI PANEL */
+  .ai-panel-inner { display: flex; gap: 14px; align-items: stretch; }
+  .ai-verdict-box {
+    flex: 0 0 120px; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px; padding: 14px 10px;
+  }
+  .ai-verdict { font-family: 'Orbitron', monospace; font-size: 22px; font-weight: 900; }
+  .ai-conf { font-size: 11px; color: var(--text2); }
+  .ai-conf span { color: var(--accent); font-weight: 600; }
+  .ai-reasoning { flex: 1; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 11px; line-height: 1.7; color: var(--text); position: relative; overflow: hidden; }
+  .ai-reasoning::before { content:'AI'; position: absolute; right: 10px; top: 8px; font-family: 'Orbitron', monospace; font-size: 28px; font-weight: 900; color: #00d4ff08; pointer-events: none; }
+  .market-regime { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px; border-radius: 7px; font-size: 11px; font-weight: 600; }
+  .regime-bull { background: #00ff8815; border: 1px solid #00ff8840; color: var(--bull); }
+  .regime-bear { background: #ff335515; border: 1px solid #ff335540; color: var(--bear); }
+  .regime-side { background: #ffcc0012; border: 1px solid #ffcc0040; color: var(--warn); }
+
+  /* WINDOWS */
+  .windows-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .window-card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; cursor: pointer; transition: all .2s; position: relative; overflow: hidden;
+  }
+  .window-card.best { border-color: #00d4ff60; box-shadow: 0 0 15px #00d4ff15; }
+  .window-card.active-win { border-color: var(--accent2); background: #00ff8808; }
+  .win-name { font-size: 10px; font-weight: 600; color: var(--text); letter-spacing: 1px; }
+  .win-time { font-size: 9px; color: var(--text2); margin: 3px 0; }
+  .win-rating { font-size: 11px; font-weight: 700; color: var(--accent); }
+  .win-badge { position: absolute; top: 6px; right: 6px; font-size: 8px; padding: 2px 6px; border-radius: 10px; background: #00d4ff22; color: var(--accent); border: 1px solid #00d4ff40; }
+  .win-progress { height: 3px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
+  .win-progress-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .5s; }
+
+  /* BOT CONTROL */
+  .bot-controls { display: flex; flex-direction: column; gap: 10px; }
+  .bot-status-row { display: flex; align-items: center; justify-content: space-between; }
+  .bot-status-label { font-size: 11px; color: var(--text2); }
+  .bot-status-val { font-size: 12px; font-weight: 600; }
+  .start-btn {
+    width: 100%; padding: 14px;
+    font-family: 'Orbitron', monospace; font-size: 13px; font-weight: 700; letter-spacing: 2px;
+    border: none; border-radius: 8px; cursor: pointer; transition: all .3s;
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    color: #000; box-shadow: 0 0 20px #00d4ff30;
+  }
+  .start-btn:hover { box-shadow: 0 0 30px #00d4ff50; transform: translateY(-1px); }
+  .start-btn.running {
+    background: linear-gradient(135deg, var(--bear), #cc0022);
+    box-shadow: 0 0 20px #ff335530; color: #fff;
+  }
+  .timer-bar-wrap { position: relative; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .timer-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent2), var(--accent)); transition: width 1s linear; width: 100%; }
+  .timer-label { font-size: 10px; color: var(--text2); margin-top: 4px; text-align: center; }
+
+  /* RIGHT PANEL */
+  .right-panel { display: flex; flex-direction: column; gap: 14px; }
+
+  /* SIGNAL FEED */
+  .signal-feed { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+  .signal-feed::-webkit-scrollbar { width: 4px; }
+  .signal-feed::-webkit-scrollbar-track { background: transparent; }
+  .signal-feed::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .signal-item {
+    background: var(--panel2); border-left: 3px solid var(--border);
+    border-radius: 0 6px 6px 0; padding: 7px 10px; font-size: 10px;
+    animation: slideIn .3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+  .signal-item.buy { border-left-color: var(--bull); }
+  .signal-item.sell { border-left-color: var(--bear); }
+  .signal-item.info { border-left-color: var(--accent); }
+  .signal-time { color: var(--text2); font-size: 9px; }
+  .signal-msg { color: var(--text); margin-top: 2px; }
+
+  /* TRADE LOG */
+  .trade-log { display: flex; flex-direction: column; gap: 5px; max-height: 180px; overflow-y: auto; }
+  .trade-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; font-size: 10px;
+  }
+  .trade-pair { color: var(--accent); font-weight: 600; }
+  .trade-pnl { font-weight: 600; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-card { background: var(--panel2); border: 1px solid var(--border); border-radius: 7px; padding: 10px; text-align: center; }
+  .stat-label { font-size: 9px; color: var(--text2); letter-spacing: 1px; margin-bottom: 4px; }
+  .stat-value { font-size: 16px; font-weight: 700; }
+
+  /* TOAST */
+  .toast-container { position: fixed; top: 70px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; font-size: 11px;
+    max-width: 280px; animation: toastIn .3s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    pointer-events: all;
+  }
+  @keyframes toastIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+  .toast.buy { border-left: 3px solid var(--bull); }
+  .toast.info { border-left: 3px solid var(--accent); }
+  .toast.warn { border-left: 3px solid var(--warn); }
+  .toast-title { font-weight: 700; margin-bottom: 4px; }
+  .toast-msg { color: var(--text2); line-height: 1.5; }
+
+  @media(max-width:1100px) {
+    .container { grid-template-columns: 1fr 1fr; }
+    .right-panel { grid-column: 1/-1; display: grid; grid-template-columns: repeat(3,1fr); }
+  }
+  @media(max-width:700px) {
+    .container { grid-template-columns: 1fr; }
+    .right-panel { grid-template-columns: 1fr; }
+    .indicator-grid { grid-template-columns: repeat(2,1fr); }
+    .windows-grid { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">APEX BOT<span>CRYPTO SPOT TRADING</span></div>
+  <div class="header-status"><div class="dot"></div><span style="font-size:11px;color:var(--text2)">LIVE MARKET</span></div>
+  <div class="header-right">
+    <div class="utc-clock" id="utcClock">00:00:00 UTC</div>
+    <div class="safe-badge">🔒 SECURE MODE</div>
+  </div>
+</header>
+
+<!-- NOTIFICATION BAR -->
+<div id="notif-bar">
+  <span class="notif-icon">📡</span>
+  <span id="notif-text">Welcome back, Numan! APEX BOT is ready. NY Open opens in 3h 22m — highest volume window 9.8/10 ⚡</span>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- PAIRS -->
+    <div class="panel">
+      <div class="panel-header">⬡ TRADING PAIRS</div>
+      <div class="panel-body">
+        <div class="pair-grid" id="pairGrid"></div>
+      </div>
+    </div>
+
+    <!-- AMOUNT -->
+    <div class="panel">
+      <div class="panel-header">💰 TRADE AMOUNT</div>
+      <div class="panel-body">
+        <div class="amount-row">
+          <input class="amount-input" id="amountInput" type="number" value="100" min="1" placeholder="USDT">
+          <button class="lock-btn" id="lockBtn" onclick="toggleLock()" title="Lock amount">🔓</button>
+        </div>
+        <div class="lock-info" id="lockInfo">Enter amount and lock to secure</div>
+        <div class="withdrawal-row" style="margin-top:10px;">
+          <div class="wd-icon">🚫</div>
+          <div class="wd-text">
+            <div class="wd-title">AUTO-WITHDRAWAL: OFF</div>
+            <div class="wd-sub">Permanently disabled. Funds stay safe.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STRATEGIES -->
+    <div class="panel">
+      <div class="panel-header">⚙ STRATEGIES</div>
+      <div class="panel-body">
+        <div class="strategy-list" id="stratList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER PANEL -->
+  <div class="center-panel">
+
+    <!-- CHART -->
+    <div class="panel">
+      <div class="panel-header">
+        📈 <span id="chartTitle">BTC/USDT</span>
+        <span style="margin-left:auto;font-size:11px;font-family:'JetBrains Mono';font-weight:400;color:var(--text)">
+          <span id="livePrice" style="color:var(--accent);font-weight:700">$67,240</span>
+          <span id="livePriceChg" style="margin-left:8px;" class="up">+1.24%</span>
+        </span>
+      </div>
+      <div class="panel-body chart-wrap">
+        <canvas id="priceChart"></canvas>
+      </div>
+    </div>
+
+    <!-- INDICATORS -->
+    <div class="panel">
+      <div class="panel-header">📊 INDICATORS</div>
+      <div class="panel-body">
+        <div class="indicator-grid" id="indicatorGrid"></div>
+      </div>
+    </div>
+
+    <!-- AI ANALYSIS -->
+    <div class="panel">
+      <div class="panel-header">🤖 AI ANALYSIS</div>
+      <div class="panel-body">
+        <div class="ai-panel-inner">
+          <div class="ai-verdict-box">
+            <div class="ai-verdict" id="aiVerdict" style="color:var(--bull)">BUY</div>
+            <div class="ai-conf">Confidence: <span id="aiConf">87%</span></div>
+          </div>
+          <div class="ai-reasoning" id="aiReasoning">
+            RSI at 42 shows room to grow before overbought. EMA 9 crossing above EMA 21 — bullish momentum building. MACD histogram positive and rising. Volume 28% above 24h average. Market regime: <strong style="color:var(--bull)">BULL</strong>. Recommend entry on next candle open with tight stop below EMA 55.
+          </div>
+        </div>
+        <div class="market-regime regime-bull" id="regimeBar">
+          <span>📈</span> MARKET REGIME: <strong>BULL RUN</strong> — Strong upward momentum detected
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADING WINDOWS -->
+    <div class="panel">
+      <div class="panel-header">🕐 TRADING WINDOWS</div>
+      <div class="panel-body">
+        <div class="windows-grid" id="windowsGrid"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <!-- BOT CONTROL -->
+    <div class="panel">
+      <div class="panel-header">🚀 BOT CONTROL</div>
+      <div class="panel-body bot-controls">
+        <div class="bot-status-row">
+          <span class="bot-status-label">STATUS</span>
+          <span class="bot-status-val" id="botStatusVal" style="color:var(--text2)">IDLE</span>
+        </div>
+        <div class="bot-status-row">
+          <span class="bot-status-label">PAIR</span>
+          <span class="bot-status-val" id="botPairVal" style="color:var(--accent)">BTC/USDT</span>
+        </div>
+        <div class="bot-status-row">
+          <span class="bot-status-label">SESSION</span>
+          <span class="bot-status-val" id="botSession">2:00:00</span>
+        </div>
+        <div class="bot-status-row">
+          <span class="bot-status-label">AMOUNT</span>
+          <span class="bot-status-val" id="botAmountVal" style="color:var(--accent2)">$100 USDT</span>
+        </div>
+        <div class="timer-bar-wrap"><div class="timer-bar" id="timerBar"></div></div>
+        <div class="timer-label" id="timerLabel">2h auto-stop ready</div>
+        <button class="start-btn" id="startBtn" onclick="toggleBot()">▶ START BOT</button>
+      </div>
+    </div>
+
+    <!-- SIGNAL FEED -->
+    <div class="panel">
+      <div class="panel-header">📡 SIGNAL FEED</div>
+      <div class="panel-body">
+        <div class="signal-feed" id="signalFeed"></div>
+      </div>
+    </div>
+
+    <!-- TRADE LOG -->
+    <div class="panel">
+      <div class="panel-header">📋 TRADE LOG</div>
+      <div class="panel-body">
+        <div class="trade-log" id="tradeLog"></div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="panel">
+      <div class="panel-header">📈 SESSION STATS</div>
+      <div class="panel-body">
+        <div class="stats-grid" id="statsGrid"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+
+// ─── DATA ───────────────────────────────────────────────────────────────
+const PAIRS = [
+  { sym: 'BTC', price: 67240, chg: +1.24 },
+  { sym: 'ETH', price: 3481,  chg: +0.87 },
+  { sym: 'BNB', price: 412,   chg: -0.33 },
+  { sym: 'SOL', price: 178,   chg: +3.12 },
+  { sym: 'XRP', price: 0.623, chg: +0.55 },
+  { sym: 'ADA', price: 0.481, chg: -0.91 },
+];
+
+const STRATEGIES = ['RSI Reversal','MACD Cross','EMA Trend','Bollinger Bands','VWAP Bounce'];
+const stratOn = [true, true, false, true, false];
+
+const WINDOWS = [
+  { name: 'ASIA OPEN',   time: '00:00–03:00', rating: 6.0, badge: null },
+  { name: 'LONDON OPEN', time: '08:00–10:00', rating: 8.5, badge: '🔥 HOT' },
+  { name: 'NY OPEN',     time: '13:00–15:00', rating: 9.8, badge: '⚡ BEST', best: true },
+  { name: 'LATE US',     time: '18:00–21:00', rating: 4.5, badge: null },
+];
+
+const INDICATORS = [
+  { name: 'RSI(14)',   value: '42.3',  signal: 'BUY' },
+  { name: 'MACD',     value: '+12.4', signal: 'BUY' },
+  { name: 'EMA CROSS',value: '↑',     signal: 'BUY' },
+  { name: 'VOLUME',   value: '+28%',  signal: 'NEUTRAL' },
+];
+
+let activePair = 0;
+let amountLocked = false;
+let botRunning = false;
+let botTimer = 7200;
+let botInterval = null;
+let priceHistory = [];
+let chart = null;
+let statsData = { trades: 0, wins: 0, pnl: 0, winrate: 0 };
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+function init() {
+  renderPairs();
+  renderStrategies();
+  renderWindows();
+  renderIndicators();
+  renderStats();
+  buildChart();
+  startClock();
+  startPriceTick();
+  addSignal('info', 'APEX BOT initialized. All systems nominal.');
+  addSignal('info', 'NY Open window in 3h 22m — best session ⚡');
+  setTimeout(() => showToast('🚀 Welcome, Numan!', 'APEX BOT is live and monitoring markets.', 'info'), 800);
+  setTimeout(() => showToast('⚡ Heads Up!', 'NY Open (13:00 UTC) opens in 3h 22m — 9.8/10 rating', 'warn'), 2500);
+  checkWindowAlerts();
+}
+
+// ─── PAIRS ───────────────────────────────────────────────────────────────
+function renderPairs() {
+  const g = document.getElementById('pairGrid');
+  g.innerHTML = PAIRS.map((p, i) => `
+    <div class="pair-btn ${i===activePair?'active':''}" onclick="selectPair(${i})">
+      <div class="pair-name">${p.sym}/USDT</div>
+      <div class="pair-price">$${p.price.toLocaleString()}</div>
+      <div class="pair-chg ${p.chg>=0?'up':'dn'}">${p.chg>=0?'+':''}${p.chg}%</div>
+    </div>`).join('');
+}
+
+function selectPair(i) {
+  activePair = i;
+  renderPairs();
+  document.getElementById('chartTitle').textContent = PAIRS[i].sym + '/USDT';
+  document.getElementById('botPairVal').textContent = PAIRS[i].sym + '/USDT';
+  const p = PAIRS[i];
+  document.getElementById('livePrice').textContent = '$' + p.price.toLocaleString();
+  document.getElementById('livePriceChg').textContent = (p.chg>=0?'+':'') + p.chg + '%';
+  document.getElementById('livePriceChg').className = p.chg >= 0 ? 'up' : 'dn';
+  rebuildChartData();
+  addSignal('info', `Switched to ${PAIRS[i].sym}/USDT`);
+}
+
+// ─── STRATEGIES ──────────────────────────────────────────────────────────
+function renderStrategies() {
+  const l = document.getElementById('stratList');
+  l.innerHTML = STRATEGIES.map((s, i) => `
+    <div class="strategy-item ${stratOn[i]?'on':''}" onclick="toggleStrat(${i})">
+      <span class="strategy-name">${s}</span>
+      <div class="toggle"></div>
+    </div>`).join('');
+}
+
+function toggleStrat(i) {
+  stratOn[i] = !stratOn[i];
+  renderStrategies();
+  addSignal('info', `${STRATEGIES[i]} ${stratOn[i]?'ENABLED':'DISABLED'}`);
+}
+
+// ─── WINDOWS ─────────────────────────────────────────────────────────────
+function renderWindows() {
+  document.getElementById('windowsGrid').innerHTML = WINDOWS.map((w, i) => `
+    <div class="window-card ${w.best?'best':''}" onclick="selectWindow(${i})">
+      ${w.badge ? `<div class="win-badge">${w.badge}</div>` : ''}
+      <div class="win-name">${w.name}</div>
+      <div class="win-time">${w.time} UTC</div>
+      <div class="win-rating">${w.rating}/10</div>
+      <div class="win-progress"><div class="win-progress-fill" style="width:${w.rating*10}%"></div></div>
+    </div>`).join('');
+}
+
+function selectWindow(i) {
+  addSignal('info', `Selected window: ${WINDOWS[i].name} (${WINDOWS[i].time} UTC) — Rating ${WINDOWS[i].rating}/10`);
+}
+
+// ─── INDICATORS ──────────────────────────────────────────────────────────
+function renderIndicators() {
+  document.getElementById('indicatorGrid').innerHTML = INDICATORS.map(ind => {
+    const cls = ind.signal === 'BUY' ? 'sig-buy' : ind.signal === 'SELL' ? 'sig-sell' : 'sig-neutral';
+    const col = ind.signal === 'BUY' ? 'var(--bull)' : ind.signal === 'SELL' ? 'var(--bear)' : 'var(--warn)';
+    return `<div class="ind-card">
+      <div class="ind-name">${ind.name}</div>
+      <div class="ind-value" style="color:${col}">${ind.value}</div>
+      <span class="ind-signal ${cls}">${ind.signal}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── AMOUNT LOCK ─────────────────────────────────────────────────────────
+function toggleLock() {
+  amountLocked = !amountLocked;
+  const inp = document.getElementById('amountInput');
+  const btn = document.getElementById('lockBtn');
+  const info = document.getElementById('lockInfo');
+  inp.disabled = amountLocked;
+  btn.textContent = amountLocked ? '🔒' : '🔓';
+  btn.className = 'lock-btn' + (amountLocked ? ' locked' : '');
+  info.textContent = amountLocked ? `✓ LOCKED at $${inp.value} USDT` : 'Enter amount and lock to secure';
+  info.className = 'lock-info' + (amountLocked ? ' locked' : '');
+  document.getElementById('botAmountVal').textContent = `$${inp.value} USDT`;
+  if (amountLocked) showToast('🔒 Amount Locked', `Bot will only use $${inp.value} USDT per trade.`, 'info');
+}
+
+// ─── BOT ─────────────────────────────────────────────────────────────────
+function toggleBot() {
+  botRunning = !botRunning;
+  const btn = document.getElementById('startBtn');
+  if (botRunning) {
+    btn.textContent = '■ STOP BOT';
+    btn.className = 'start-btn running';
+    document.getElementById('botStatusVal').textContent = 'RUNNING';
+    document.getElementById('botStatusVal').style.color = 'var(--bull)';
+    botTimer = 7200;
+    startBotTimer();
+    showToast('▶ Bot Started!', `Trading ${PAIRS[activePair].sym}/USDT with 2h auto-stop.`, 'buy');
+    addSignal('buy', `Bot STARTED on ${PAIRS[activePair].sym}/USDT — 2h session`);
+    if (!amountLocked) showToast('⚠ Warning', 'Amount not locked. Consider locking for safety.', 'warn');
+    botSimLoop();
+  } else {
+    btn.textContent = '▶ START BOT';
+    btn.className = 'start-btn';
+    document.getElementById('botStatusVal').textContent = 'STOPPED';
+    document.getElementById('botStatusVal').style.color = 'var(--text2)';
+    clearInterval(botInterval);
+    document.getElementById('timerBar').style.width = '100%';
+    document.getElementById('timerLabel').textContent = '2h auto-stop ready';
+    document.getElementById('botSession').textContent = '2:00:00';
+    showToast('■ Bot Stopped', 'Session ended. Review your trade log.', 'info');
+    addSignal('info', 'Bot STOPPED by user.');
+  }
+}
+
+function startBotTimer() {
+  clearInterval(botInterval);
+  botInterval = setInterval(() => {
+    botTimer--;
+    const pct = (botTimer / 7200) * 100;
+    document.getElementById('timerBar').style.width = pct + '%';
+    const h = Math.floor(botTimer/3600);
+    const m = Math.floor((botTimer%3600)/60);
+    const s = botTimer % 60;
+    document.getElementById('botSession').textContent = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    document.getElementById('timerLabel').textContent = `Auto-stop in ${h}h ${m}m`;
+    if (botTimer <= 0) {
+      clearInterval(botInterval);
+      botRunning = false;
+      document.getElementById('startBtn').textContent = '▶ START BOT';
+      document.getElementById('startBtn').className = 'start-btn';
+      document.getElementById('botStatusVal').textContent = 'AUTO-STOPPED';
+      document.getElementById('botStatusVal').style.color = 'var(--warn)';
+      showToast('⏱ Auto-Stop', '2-hour session complete. Bot stopped automatically.', 'warn');
+      addSignal('info', '2h AUTO-STOP triggered. Session complete.');
+    }
+  }, 1000);
+}
+
+let simTimeout = null;
+function botSimLoop() {
+  if (!botRunning) return;
+  const delay = 8000 + Math.random() * 12000;
+  simTimeout = setTimeout(() => {
+    if (!botRunning) return;
+    const isBuy = Math.random() > 0.4;
+    const pair = PAIRS[activePair].sym;
+    const pnl = (Math.random() * 20 - 8).toFixed(2);
+    const win = parseFloat(pnl) > 0;
+    statsData.trades++;
+    if (win) { statsData.wins++; statsData.pnl += parseFloat(pnl); }
+    else statsData.pnl += parseFloat(pnl);
+    statsData.winrate = Math.round((statsData.wins / statsData.trades) * 100);
+    addSignal(isBuy ? 'buy' : 'sell', `${pair}/USDT — ${isBuy ? 'LONG' : 'SHORT'} signal triggered`);
+    addTrade(pair, isBuy ? 'BUY' : 'SELL', pnl);
+    renderStats();
+    botSimLoop();
+  }, delay);
+}
+
+// ─── SIGNALS & TRADES ────────────────────────────────────────────────────
+function addSignal(type, msg) {
+  const f = document.getElementById('signalFeed');
+  const now = new Date();
+  const t = now.toUTCString().slice(17, 25);
+  const el = document.createElement('div');
+  el.className = `signal-item ${type}`;
+  el.innerHTML = `<div class="signal-time">${t} UTC</div><div class="signal-msg">${msg}</div>`;
+  f.prepend(el);
+  while (f.children.length > 20) f.removeChild(f.lastChild);
+}
+
+function addTrade(pair, side, pnl) {
+  const log = document.getElementById('tradeLog');
+  const win = parseFloat(pnl) > 0;
+  const el = document.createElement('div');
+  el.className = 'trade-item';
+  el.innerHTML = `
+    <span class="trade-pair">${pair}</span>
+    <span style="color:${side==='BUY'?'var(--bull)':'var(--bear)'}; font-size:10px;">${side}</span>
+    <span class="trade-pnl ${win?'up':'dn'}">${win?'+':''}${pnl} USDT</span>`;
+  log.prepend(el);
+  while (log.children.length > 15) log.removeChild(log.lastChild);
+}
+
+// ─── STATS ───────────────────────────────────────────────────────────────
+function renderStats() {
+  const pnlColor = statsData.pnl >= 0 ? 'var(--bull)' : 'var(--bear)';
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">TRADES</div><div class="stat-value" style="color:var(--accent)">${statsData.trades}</div></div>
+    <div class="stat-card"><div class="stat-label">WIN RATE</div><div class="stat-value" style="color:var(--accent2)">${statsData.winrate}%</div></div>
+    <div class="stat-card"><div class="stat-label">P&L</div><div class="stat-value" style="color:${pnlColor}">${statsData.pnl>=0?'+':''}${statsData.pnl.toFixed(2)}</div></div>
+    <div class="stat-card"><div class="stat-label">WINS</div><div class="stat-value" style="color:var(--bull)">${statsData.wins}</div></div>`;
+}
+
+// ─── CHART ───────────────────────────────────────────────────────────────
+function generatePriceData(base, count) {
+  const data = []; let p = base;
+  for (let i = 0; i < count; i++) { p += (Math.random() - 0.48) * base * 0.005; data.push(+p.toFixed(2)); }
+  return data;
+}
+
+function calcEMA(data, period) {
+  const k = 2 / (period + 1); const ema = [data[0]];
+  for (let i = 1; i < data.length; i++) ema.push(data[i] * k + ema[i-1] * (1-k));
+  return ema;
+}
+
+function buildChart() {
+  const base = PAIRS[activePair].price;
+  priceHistory = generatePriceData(base, 60);
+  const labels = Array.from({length:60}, (_,i) => { const m = new Date(); m.setMinutes(m.getMinutes()-59+i); return m.toTimeString().slice(0,5); });
+  const ema9 = calcEMA(priceHistory, 9);
+  const ema21 = calcEMA(priceHistory, 21);
+  const ema55 = calcEMA(priceHistory, 55);
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 280);
+  grad.addColorStop(0, 'rgba(0,212,255,0.25)');
+  grad.addColorStop(1, 'rgba(0,212,255,0)');
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Price', data: priceHistory, borderColor: '#00d4ff', backgroundColor: grad, borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 },
+        { label: 'EMA 9',  data: ema9,  borderColor: '#00ff88', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+        { label: 'EMA 21', data: ema21, borderColor: '#ffcc00', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+        { label: 'EMA 55', data: ema55, borderColor: '#ff6b35', borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+      plugins: { legend: { display: true, labels: { color: '#5a8a9f', font: { size: 10, family: 'JetBrains Mono' }, boxWidth: 20, padding: 10 } } },
+      scales: {
+        x: { grid: { color: '#0f253520' }, ticks: { color: '#5a8a9f', font: { size: 9 }, maxTicksLimit: 8 } },
+        y: { position: 'right', grid: { color: '#0f253540' }, ticks: { color: '#5a8a9f', font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+function rebuildChartData() {
+  if (!chart) return;
+  const base = PAIRS[activePair].price;
+  priceHistory = generatePriceData(base, 60);
+  const ema9 = calcEMA(priceHistory, 9);
+  const ema21 = calcEMA(priceHistory, 21);
+  const ema55 = calcEMA(priceHistory, 55);
+  chart.data.datasets[0].data = priceHistory;
+  chart.data.datasets[1].data = ema9;
+  chart.data.datasets[2].data = ema21;
+  chart.data.datasets[3].data = ema55;
+  chart.update();
+}
+
+// ─── PRICE TICK ──────────────────────────────────────────────────────────
+function startPriceTick() {
+  setInterval(() => {
+    const p = PAIRS[activePair];
+    const delta = (Math.random() - 0.49) * p.price * 0.002;
+    p.price = +(p.price + delta).toFixed(p.price > 10 ? 2 : 4);
+    p.chg = +(p.chg + (Math.random() - 0.5) * 0.05).toFixed(2);
+    document.getElementById('livePrice').textContent = '$' + p.price.toLocaleString();
+    document.getElementById('livePriceChg').textContent = (p.chg >= 0 ? '+' : '') + p.chg + '%';
+    document.getElementById('livePriceChg').className = p.chg >= 0 ? 'up' : 'dn';
+    renderPairs();
+    // push to chart
+    if (chart) {
+      priceHistory.push(p.price); priceHistory.shift();
+      const ema9 = calcEMA(priceHistory, 9);
+      const ema21 = calcEMA(priceHistory, 21);
+      const ema55 = calcEMA(priceHistory, 55);
+      chart.data.datasets[0].data = [...priceHistory];
+      chart.data.datasets[1].data = ema9;
+      chart.data.datasets[2].data = ema21;
+      chart.data.datasets[3].data = ema55;
+      chart.update('none');
+    }
+  }, 2000);
+}
+
+// ─── CLOCK ───────────────────────────────────────────────────────────────
+function startClock() {
+  function tick() {
+    const now = new Date();
+    document.getElementById('utcClock').textContent = now.toUTCString().slice(17, 25) + ' UTC';
+  }
+  tick(); setInterval(tick, 1000);
+}
+
+// ─── TOASTS ──────────────────────────────────────────────────────────────
+function showToast(title, msg, type) {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<div class="toast-title">${title}</div><div class="toast-msg">${msg}</div>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .4s'; setTimeout(() => t.remove(), 400); }, 4000);
+}
+
+// ─── WINDOW ALERTS ───────────────────────────────────────────────────────
+function checkWindowAlerts() {
+  setInterval(() => {
+    const now = new Date();
+    const h = now.getUTCHours(), m = now.getUTCMinutes();
+    const mins = h * 60 + m;
+    // London: 480 (08:00 UTC), NY: 780 (13:00 UTC)
+    if (mins === 475) showToast('🔥 London Open in 5m!', 'High volume window opening. Rating: 8.5/10', 'warn');
+    if (mins === 775) showToast('⚡ NY Open in 5m!', 'BEST window opening! Rating: 9.8/10', 'warn');
+  }, 60000);
+}
+
+// ─── NOTIF BAR ROTATION ──────────────────────────────────────────────────
+const notifs = [
+  'Welcome back, Numan! APEX BOT is ready. NY Open in 3h 22m — 9.8/10 ⚡',
+  '🔒 Auto-withdrawal is permanently OFF. Your funds are secured.',
+  '📊 All 5 strategies ready. 3 currently active.',
+  '⚡ NY Open (13:00–15:00 UTC) is the highest volume window — 9.8/10 rating',
+  '🤖 AI verdict: BUY with 87% confidence on BTC/USDT',
+];
+let notifIdx = 0;
+setInterval(() => {
+  notifIdx = (notifIdx + 1) % notifs.length;
+  document.getElementById('notif-text').textContent = notifs[notifIdx];
+}, 6000);
+
+// ─── LAUNCH ──────────────────────────────────────────────────────────────
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
